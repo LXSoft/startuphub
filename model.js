@@ -204,3 +204,5 @@ var contactEmail = function (user) {
     return user.services.facebook.email;
   return null;
 };
+
+console.log("Fetched parties entryes: "+Parties.find().fetch());
