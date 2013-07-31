@@ -14,6 +14,12 @@
     invited: Array of user id's that are invited (only if !public)
     rsvps: Array of objects like {user: userId, rsvp: "yes"} (or "no"/"maybe")
 */
+
+// Attending function
+var attending = function (party) {
+  return (_.groupBy(party.rsvps, 'rsvp').yes || []).length;
+};
+
 Parties = new Meteor.Collection("parties");
 
 Parties.allow({
@@ -42,10 +48,6 @@ Parties.allow({
     });
   }
 });
-
-var attending = function (party) {
-  return (_.groupBy(party.rsvps, 'rsvp').yes || []).length;
-};
 
 Meteor.methods({
   // options should include: title, description, x, y, date, public
@@ -187,22 +189,3 @@ Meteor.methods({
     }
   }
 });
-
-///////////////////////////////////////////////////////////////////////////////
-// Users
-
-var displayName = function (user) {
-  if (user.profile && user.profile.name)
-    return user.profile.name;
-  return user.emails[0].address;
-};
-
-var contactEmail = function (user) {
-  if (user.emails && user.emails.length)
-    return user.emails[0].address;
-  if (user.services && user.services.facebook && user.services.facebook.email)
-    return user.services.facebook.email;
-  return null;
-};
-
-console.log("Fetched parties entryes: "+Parties.find().fetch());
