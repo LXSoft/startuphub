@@ -3,6 +3,28 @@
 Meteor.subscribe("directory");
 Meteor.subscribe("parties");
 
+// Attending function
+var attending = function (party) {
+  return (_.groupBy(party.rsvps, 'rsvp').yes || []).length;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+// Users
+
+var displayName = function (user) {
+  if (user.profile && user.profile.name)
+    return user.profile.name;
+  return user.emails[0].address;
+};
+
+var contactEmail = function (user) {
+  if (user.emails && user.emails.length)
+    return user.emails[0].address;
+  if (user.services && user.services.facebook && user.services.facebook.email)
+    return user.services.facebook.email;
+  return null;
+};
+
 // If no party selected, select one.
 Meteor.startup(function () {
   Meteor.autorun(function () {
@@ -131,19 +153,37 @@ Template.attendance.canInvite = function () {
 // Calendar display
 
 var Months = new Array("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December");
-var adjustMonth = function (Num){
+
+var adjustMonth = function (Num)
+{
   var D = new Date(Session.get("Date"));
-  if(D.getDate() > 28){ D.setDate(28); }
+   
+   // maybe we will need to use prev to show outdated events  
+  //var prevMonth = new Date(D.getFullYear(), D.getMonth()+Num, 0);
+  //var currMonth = new Date(D.getFullYear(), D.getMonth()+Num+1, 0);
+  var nextMonth = new Date(D.getFullYear(), D.getMonth()+Num+1, 0);
+  
+  //console.log("Last month: "+prevMonth.getDate());
+  //console.log("Current month: "+currMonth.getDate());
+  //console.log("Current month max day:"+D.getDate()+">"+"Next month: "+nextMonth.getDate());
+  
+  if(D.getDate() > nextMonth.getDate())
+  {
+	D.setDate(nextMonth.getDate());
+  }
+  
   D.setMonth(D.getMonth()+Num);
   Session.set("Date", D.toDateString());  
 }
 
-Template.calendar.DateString = function(){
+Template.calendar.DateString = function()
+{
   var D = new Date(Session.get("Date"));
   return Months[D.getMonth()] + ", " + D.getFullYear();
 }
 
-Template.calendar.GetDays = function(){
+Template.calendar.GetDays = function()
+{
   var S = new Date(Session.get("Date")),
       start = new Date(S.getFullYear(), S.getMonth(),0) 
       end = new Date(S.getFullYear(), S.getMonth()+1, 0),
@@ -180,6 +220,19 @@ Template.calendar.events({
     D.setDate(this.Number);
     Session.set("Date", D.toDateString());
     if(event.currentTarget.id !='')
+	  /*Template.details.creatorName = function()
+	  {
+		var Days = Template.calendar.GetDays();
+		var out;
+		for (var d in Days)
+		{
+			for (var p in Days[d])
+			{
+				out+="\n"+"Object -> Proptiety: " + p + "|| Value: " + Days[d][p];
+			}
+		}
+		return out;
+	  }*/
       Session.set("selected", event.currentTarget.id);
   }
 });
@@ -217,7 +270,7 @@ Template.map.rendered = function () {
       var selected = Session.get('selected');
       var selectedParty = selected && Parties.findOne(selected);
       var radius = function (party) {
-        return 10 + Math.sqrt(attending(party)) * 10;
+        return 10 + Math.sqrt(attending(party)) * 20;
       };
 
       // Draw a circle for each party
@@ -262,12 +315,21 @@ Template.map.rendered = function () {
       // Draw a dashed circle around the currently selected party, if any
       var callout = d3.select(self.node).select("circle.callout")
         .transition().duration(250).ease("cubic-out");
+		
       if (selectedParty)
+		
         callout.attr("cx", selectedParty.x * 500)
         .attr("cy", selectedParty.y * 500)
         .attr("r", radius(selectedParty) + 10)
         .attr("class", "callout")
         .attr("display", '');
+		/*var speed = 4;
+		d3.timer(function() {
+  var angle = (Date.now() - 1933) * speed,
+      transform = function(d) { return "rotate(" + angle / d.radius + ")"; };
+  callout.attr("transform", transform); // frame of reference
+});*/
+		
       else
         callout.attr("display", 'none');
     });
@@ -315,6 +377,7 @@ Template.createDialog.events({
         }
       });
       Session.set("showCreateDialog", false);
+	  console.log("Error at field length.");
     } else {
       Session.set("createError",
                   "It needs a title and a description, or why bother?");
