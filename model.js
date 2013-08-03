@@ -81,6 +81,38 @@ Meteor.methods({
       items: []
     });
   },
+  
+  // edit party created
+  editParty: function (options) {
+    options = options || {};
+    if (! (typeof options.title === "string" && options.title.length &&
+           typeof options.description === "string" &&
+           options.description.length &&
+           typeof options.x === "number" && options.x >= 0 && options.x <= 1 &&
+           typeof options.y === "number" && options.y >= 0 && options.y <= 1 &&
+           Object.prototype.toString.call(options.date) === "[object Date]" 
+           ))
+      throw new Meteor.Error(400, "Required parameter missing");
+    if (options.title.length > 100)
+      throw new Meteor.Error(413, "Title too long");
+    if (options.description.length > 1000)
+      throw new Meteor.Error(413, "Description too long");
+    if (! this.userId)
+      throw new Meteor.Error(403, "You must be logged in");
+
+    return Parties.insert({
+      owner: this.userId,
+      x: options.x,
+      y: options.y,
+      date: options.date,
+      title: options.title,
+      description: options.description,
+      public: !! options.public,
+      invited: [],
+      rsvps: [],
+      items: []
+    });
+  },
 
   invite: function (partyId, userId) {
     var party = Parties.findOne(partyId);

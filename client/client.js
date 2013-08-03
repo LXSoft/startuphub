@@ -4,237 +4,324 @@ Meteor.subscribe("directory");
 Meteor.subscribe("parties");
 
 // Attending function
-var attending = function (party) {
-  return (_.groupBy(party.rsvps, 'rsvp').yes || []).length;
+var attending = function(party)
+{
+	return (_.groupBy(party.rsvps, 'rsvp').yes || []).length;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
 // Users
 
-var displayName = function (user) {
-  if (user.profile && user.profile.name)
-    return user.profile.name;
-  return user.emails[0].address;
+var displayName = function(user)
+{
+	if (user.profile && user.profile.name)
+		return user.profile.name;
+	return user.emails[0].address;
 };
 
-var contactEmail = function (user) {
-  if (user.emails && user.emails.length)
-    return user.emails[0].address;
-  if (user.services && user.services.facebook && user.services.facebook.email)
-    return user.services.facebook.email;
-  return null;
+var contactEmail = function(user)
+{
+	if (user.emails && user.emails.length)
+		return user.emails[0].address;
+	if (user.services && user.services.facebook && user.services.facebook.email)
+		return user.services.facebook.email;
+	return null;
 };
 
 // If no party selected, select one.
-Meteor.startup(function () {
-  Meteor.autorun(function () {
-    if (! Session.get("Date")) {
-      Session.set("Date", new Date().toDateString());
-    }
-    if (! Session.get("selected")) {
-      var party = Parties.findOne();
-      if (party)
-        Session.set("selected", party._id);
-    }
-  });
+Meteor.startup(function()
+{
+	Meteor.autorun(function()
+	{
+		if (!Session.get("Date"))
+		{
+			Session.set("Date", new Date().toDateString());
+		}
+		if (!Session.get("selected"))
+		{
+			var party = Parties.findOne();
+			if (party) Session.set("selected", party._id);
+		}
+	});
 });
 
 ///////////////////////////////////////////////////////////////////////////////
 // Party details sidebar
 
-Template.details.party = function () {
-  return Parties.findOne(Session.get("selected"));
+Template.details.party = function()
+{
+	return Parties.findOne(Session.get("selected"));
 };
 
-Template.details.anyParties = function () {
-  return Parties.find().count() > 0;
+Template.details.anyParties = function()
+{
+	return Parties.find().count() > 0;
 };
 
-Template.details.creatorName = function () {
-  var owner = Meteor.users.findOne(this.owner);
-  if (owner._id === Meteor.userId())
-    return "me";
-  return displayName(owner);
+Template.details.creatorName = function()
+{
+	var owner = Meteor.users.findOne(this.owner);
+	if (owner._id === Meteor.userId()) return "me";
+	return displayName(owner);
 };
 
-Template.details.canRemove = function () {
-  return this.owner === Meteor.userId() && attending(this) === 0;
+Template.details.maybeChosen = function(what)
+{
+	var myRsvp = _.find(this.rsvps, function(r)
+	{
+		return r.user === Meteor.userId();
+	}) || {};
+	return what == myRsvp.rsvp ? "chosen btn-inverse" : "";
 };
 
-Template.details.maybeChosen = function (what) {
-  var myRsvp = _.find(this.rsvps, function (r) {
-    return r.user === Meteor.userId();
-  }) || {};
-
-  return what == myRsvp.rsvp ? "chosen btn-inverse" : "";
-};
-
-
-Template.details.itemsForParty = function(){
-  var party = Parties.findOne(Session.get("selected"));
-  if (! party)
-    return []; // party hasn't loaded yet
-  return party.items;
+Template.details.itemsForParty = function()
+{
+	var party = Parties.findOne(Session.get("selected"));
+	if (! party) return []; // party hasn't loaded yet
+	return party.items;
 }
   
-Template.details.DayString = function(){
-  var D = new Date(Session.get("Date"));
-  return "Items for " + Months[D.getMonth()] + ", " + D.getDate();
+Template.details.DayString = function()
+{
+	var date = new Date(Session.get("Date"));
+	return "Items for " + Months[date.getMonth()] + ", " + date.getDate();
 }
 
+//////////////////////////////////////////////////////////////////////
+// Event listeners for details sidebar template
 
-Template.details.events({
-  'click .rsvp_yes': function () {
-    Meteor.call("rsvp", Session.get("selected"), "yes");
-    return false;
-  },
-  'click .rsvp_maybe': function () {
-    Meteor.call("rsvp", Session.get("selected"), "maybe");
-    return false;
-  },
-  'click .rsvp_no': function () {
-    Meteor.call("rsvp", Session.get("selected"), "no");
-    return false;
-  },
-  'click .invite': function () {
-    openInviteDialog();
-    return false;
-  },
-  'click .remove': function () {
-    Parties.remove(this._id);
-    return false;
-  },
-  'click .create': function () {
-    if (! Meteor.userId()) // must be logged in to create events
-      return;
-    var date = Session.get("Date");
-    openCreateDialog(1, 1, date);
-  },
-  'click #ItemsButton': function () {
-    var emptyText='New item text(click to edit)';
-    Meteor.call("item", Session.get("selected"), emptyText);
-    return false;
-  },
+Template.details.events(
+{
+	'click .rsvp_yes': function()
+	{
+		Meteor.call("rsvp", Session.get("selected"), "yes");
+		return false;
+	},
+	'click .rsvp_maybe': function()
+	{
+		Meteor.call("rsvp", Session.get("selected"), "maybe");
+		return false;
+	},
+	'click .rsvp_no': function()
+	{
+		Meteor.call("rsvp", Session.get("selected"), "no");
+		return false;
+	},
+	'click .invite': function()
+	{
+		openInviteDialog();
+		return false;
+	},
+	'click .remove': function()
+	{
+		Parties.remove(this._id);
+		return false;
+	},
+	'click .create': function()
+	{
+		if (!Meteor.userId()) return;
+		var date = Session.get("Date");
+		openCreateDialog(1, 1, date);
+	},
+	'click .edit': function()
+	{
+		if (!Meteor.userId() && !canEdit()) return;
+		var date = Session.get("Date");
+		// Parties.edit(this.id);
+		openEditDialog(1, 1, date);
+	},
+	'click #ItemsButton': function()
+	{
+		var emptyText='New item text(click to edit)';
+		Meteor.call("item", Session.get("selected"), emptyText);
+		return false;
+	}
 });
+
+///////////////////////////////////////////////////////////////////////////////
+// User permissions
+
+// If no one attend to the party, creator can delete it
+Template.details.canRemove = function()
+{
+	return this.owner === Meteor.userId() && attending(this) === 0;
+};
+
+// If creator of party is logged in can edit this event
+Template.event.canEdit = function()
+{
+	return this.owner === Meteor.userId();
+};
+
+// Any logged in user can create events
+Template.event.canCreate = function()
+{
+	return true;
+};
 
 ///////////////////////////////////////////////////////////////////////////////
 // Party attendance widget
 
-Template.attendance.rsvpName = function () {
-  var user = Meteor.users.findOne(this.user);
-  return displayName(user);
+Template.attendance.rsvpName = function()
+{
+	var user = Meteor.users.findOne(this.user);
+	return displayName(user);
 };
 
-Template.attendance.outstandingInvitations = function () {
-  var party = Parties.findOne(this._id);
-  return Meteor.users.find({$and: [
-    {_id: {$in: party.invited}}, // they're invited
-    {_id: {$nin: _.pluck(party.rsvps, 'user')}} // but haven't RSVP'd
-  ]});
+Template.attendance.outstandingInvitations = function()
+{
+	var party = Parties.findOne(this._id);
+	return Meteor.users.find(
+	{
+		$and:
+		[
+			{_id: {$in: party.invited}},                // they're invited
+			{_id: {$nin: _.pluck(party.rsvps, 'user')}} // but haven't RSVP'd
+		]
+	});
 };
 
-Template.attendance.invitationName = function () {
-  return displayName(this);
+Template.attendance.invitationName = function()
+{
+	return displayName(this);
 };
 
-Template.attendance.rsvpIs = function (what) {
-  return this.rsvp === what;
+Template.attendance.rsvpIs = function(what)
+{
+	return this.rsvp === what;
 };
 
-Template.attendance.nobody = function () {
-  return ! this.public && (this.rsvps.length + this.invited.length === 0);
+Template.attendance.nobody = function()
+{
+	return !this.public && (this.rsvps.length + this.invited.length === 0);
 };
 
-Template.attendance.canInvite = function () {
-  return ! this.public && this.owner === Meteor.userId();
+Template.attendance.canInvite = function()
+{
+	return !this.public && this.owner === Meteor.userId();
 };
 
 ///////////////////////////////////////////////////////////////////////////////
-// Calendar display
+// Calendar widget display
 
 var Months = new Array("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December");
 
-var adjustMonth = function (Num)
+var adjustMonth = function (num)
 {
-  var D = new Date(Session.get("Date"));
-   
-   // maybe we will need to use prev to show outdated events  
-  //var prevMonth = new Date(D.getFullYear(), D.getMonth()+Num, 0);
-  //var currMonth = new Date(D.getFullYear(), D.getMonth()+Num+1, 0);
-  var nextMonth = new Date(D.getFullYear(), D.getMonth()+Num+1, 0);
-  
-  //console.log("Last month: "+prevMonth.getDate());
-  //console.log("Current month: "+currMonth.getDate());
-  //console.log("Current month max day:"+D.getDate()+">"+"Next month: "+nextMonth.getDate());
-  
-  if(D.getDate() > nextMonth.getDate())
-  {
-	D.setDate(nextMonth.getDate());
-  }
-  
-  D.setMonth(D.getMonth()+Num);
-  Session.set("Date", D.toDateString());  
+	var date = new Date(Session.get("Date"));
+	var nextMonth = new Date(date.getFullYear(), date.getMonth()+num+1, 0);
+	if(date.getDate() > nextMonth.getDate())
+	{
+		date.setDate(nextMonth.getDate());
+	}
+	date.setMonth(date.getMonth()+num);
+	Session.set("Date", date.toDateString());  
 }
 
 Template.calendar.DateString = function()
 {
-  var D = new Date(Session.get("Date"));
-  return Months[D.getMonth()] + ", " + D.getFullYear();
+	var date = new Date(Session.get("Date"));
+	return Months[date.getMonth()] + ", " + date.getFullYear();
 }
 
 Template.calendar.GetDays = function()
 {
-  var S = new Date(Session.get("Date")),
-      start = new Date(S.getFullYear(), S.getMonth(),0) 
-      end = new Date(S.getFullYear(), S.getMonth()+1, 0),
-      Days = new Array({Number: "Su"}, {Number: "Mo"}, {Number: "Tu"}, {Number: "We"}, {Number: "Th"}, {Number: "Fr"}, {Number: "Sa"}),
-      partyDays = Parties.find({date:{$gte:start, $lte:end}}).map(function(party){
-        var d = new Date(party.date),
-            o = { 'day': d.getDate(), 'id' : party._id};
-            // o = {d.getDate().toDateString : party._id};
-        return o;
-      });
-
-  for(var i = 0; i<end.getDay(); i++){ Days.push({Number : "_"}); }
-  for(var i = 0; i<end.getDate(); i++)
-  {
-    if(S.getDate() == i+1){ 
-      if ( _.contains(_.pluck(partyDays, 'day'), i+1) ) { 
-        Days.push({'Number' : i+1, 'Class': " EventDaySelected",  'id': _.pluck(partyDays, 'id')[_.pluck(partyDays, 'day').indexOf(i+1)] }); 
-      } 
-      else Days.push({'Number' : i+1, 'Class': " DaySelected"}); 
-    }
-    else if ( _.contains(_.pluck(partyDays, 'day'), i+1) ) { 
-      Days.push({'Number' : i+1, 'Class': " DayClick Event",  'id': _.pluck(partyDays, 'id')[_.pluck(partyDays, 'day').indexOf(i+1)] }); 
-    }
-    else { Days.push({'Number' : i+1, 'Class': " DayClick" }); }
-  }
-  return Days;
-}
-
-Template.calendar.events({
-  'click #NextMonth': function(){ adjustMonth(1);  },
-  'click #LastMonth': function(){ adjustMonth(-1); },
-  'click .DayClick':function(event){
-    var D = new Date(Session.get("Date"));
-    D.setDate(this.Number);
-    Session.set("Date", D.toDateString());
-    if(event.currentTarget.id !='')
-	  /*Template.details.creatorName = function()
-	  {
-		var Days = Template.calendar.GetDays();
-		var out;
-		for (var d in Days)
+	var date      = new Date(Session.get("Date")),
+	    start     = new Date(date.getFullYear(), date.getMonth(), 0),
+		end       = new Date(date.getFullYear(), date.getMonth() + 1, 0),
+        Days      = new Array({Number: "Su"}, {Number: "Mo"},
+						  {Number: "Tu"}, {Number: "We"},
+						  {Number: "Th"}, {Number: "Fr"},
+						  {Number: "Sa"}),
+		partyDays = Parties.find({date:{$gte:start, $lte:end}}).map(function(party)
 		{
-			for (var p in Days[d])
+			var d = new Date(party.date),
+			    o = { 'day': d.getDate(), 'id' : party._id};
+			return o;
+		});
+		
+	for(var i = 0; i < end.getDay(); i++)
+	{
+		Days.push({Number : "_"});
+	}
+	
+	for(var i = 0; i < end.getDate(); i++)
+	{
+		if(date.getDate() == i + 1)
+		{
+			if (_.contains(_.pluck(partyDays, 'day'), i + 1))
 			{
-				out+="\n"+"Object -> Proptiety: " + p + "|| Value: " + Days[d][p];
+				Days.push(
+				{
+					'Number' : i + 1,
+					'Class': " EventDaySelected",
+					'id': _.pluck(partyDays, 'id')[_.pluck(partyDays, 'day').indexOf(i+1)]
+				});
+			}
+			else
+			{
+				Days.push(
+				{
+					'Number' : i + 1,
+					'Class': " DaySelected"
+				});
 			}
 		}
-		return out;
-	  }*/
-      Session.set("selected", event.currentTarget.id);
-  }
+		else if ( _.contains(_.pluck(partyDays, 'day'), i + 1))
+		{
+			Days.push(
+			{
+				'Number' : i + 1,
+				'Class': " DayClick Event ",
+				'id': _.pluck(partyDays, 'id')[_.pluck(partyDays, 'day').indexOf(i+1)]
+			}); 
+		}
+		else
+		{
+			Days.push(
+			{
+				'Number' : i + 1,
+				'Class': " DayClick"
+			});
+		}
+	}
+	return Days;
+}
+
+Template.calendar.events(
+{
+	'click #NextMonth': function()
+	{
+		adjustMonth(1);
+	},
+	'click #LastMonth': function()
+	{
+		adjustMonth(-1);
+	},
+	'click .DayClick': function(e)
+	{
+		var date = new Date(Session.get("Date"));
+		date.setDate(this.Number);
+		Session.set("Date", date.toDateString());
+		// If no event is created today user can create one
+		Template.event.canCreate = function() {return true;}
+		if(e.currentTarget.id != '')
+		{
+			Session.set("selected", e.currentTarget.id);
+		}
+		else
+		{
+			// Increment current node until target meets node with class Event,
+			// this means there is an event, try to animate this movement
+			// using jquery
+			//$(e.currentTarget).nextUntil(".Event").addClass("DaySelected");
+		}
+	},
+	'click .Event': function()
+	{
+		// If event already exist user cannot create one
+		Template.event.canCreate = function() {return false;}
+	}
 });
 
 
@@ -242,57 +329,67 @@ Template.calendar.events({
 // Map display
 
 // Use jquery to get the position clicked relative to the map element.
-var coordsRelativeToElement = function (element, event) {
-  var offset = $(element).offset();
-  var x = event.pageX - offset.left;
-  var y = event.pageY - offset.top;
-  return { x: x, y: y };
+// Relative coords to element => relCoords
+var relCoords = function(element, event)
+{
+	var offset = $(element).offset();
+	var x = event.pageX - offset.left;
+	var y = event.pageY - offset.top;
+	return { x: x, y: y };
 };
 
-Template.map.events({
-  'mousedown circle, mousedown text': function (event, template) {
-    Session.set("selected", event.currentTarget.id);
-  },
-  'dblclick .map': function (event, template) {
-    if (! Meteor.userId()) // must be logged in to create events
-      return;
-    var coords = coordsRelativeToElement(event.currentTarget, event);
-    openCreateDialog(coords.x / 500, coords.y / 500);
-  }
+Template.map.events(
+{
+	'mousedown circle, mousedown text': function(event, template)
+	{
+		Session.set("selected", event.currentTarget.id);
+	},
+	'dblclick .map': function(event, template)
+	{
+		if (!Meteor.userId()) return;
+		var coords = relCoords(event.currentTarget, event);
+		openCreateDialog(coords.x / 500, coords.y / 500);
+	}
 });
 
-Template.map.rendered = function () {
-  var self = this;
-  self.node = self.find("svg");
-
-  if (! self.handle) {
-    self.handle = Meteor.autorun(function () {
-      var selected = Session.get('selected');
-      var selectedParty = selected && Parties.findOne(selected);
-      var radius = function (party) {
-        return 10 + Math.sqrt(attending(party)) * 20;
-      };
-
-      // Draw a circle for each party
-      var updateCircles = function (group) {
-        group.attr("id", function (party) { return party._id; })
-        .attr("cx", function (party) { return party.x * 500; })
-        .attr("cy", function (party) { return party.y * 500; })
-        .attr("r", radius)
-        .attr("class", function (party) {
-          return party.public ? "public" : "private";
-        })
-        .style('opacity', function (party) {
-          return selected === party._id ? 1 : 0.6;
-        });
-      };
-
-      var circles = d3.select(self.node).select(".circles").selectAll("circle")
-        .data(Parties.find().fetch(), function (party) { return party._id; });
-
-      updateCircles(circles.enter().append("circle"));
-      updateCircles(circles.transition().duration(250).ease("cubic-out"));
-      circles.exit().transition().duration(250).attr("r", 0).remove();
+Template.map.rendered = function()
+{
+	var self = this;
+	self.node = self.find("svg");
+	if (!self.handle)
+	{
+		self.handle = Meteor.autorun(function()
+		{
+			var selected = Session.get('selected');
+			var selectedParty = selected && Parties.findOne(selected);
+			var radius = function(party)
+			{
+				return 10 + Math.sqrt(attending(party)) * 20;
+			};	
+			
+			// Draw a circle for each party
+			var updateCircles = function(group)
+			{
+				group.attr("id", function(party) {return party._id;})
+				     .attr("cx", function(party) {return party.x * 500;})
+					 .attr("cy", function(party) {return party.y * 500;})
+					 .attr("r",  radius)
+					 .attr("class", function(party)
+					 {
+						return party.public ? "public" : "private";
+					})
+					.style('opacity', function(party)
+					{
+						return selected === party._id ? 1 : 0.6;
+					});
+			};
+			
+			var circles = d3.select(self.node).select(".circles").selectAll("circle")
+			.data(Parties.find().fetch(),function(party){ return party._id; });
+			
+			updateCircles(circles.enter().append("circle"));
+			updateCircles(circles.transition().duration(250).ease("cubic-out"));
+			circles.exit().transition().duration(250).attr("r", 0).remove();
 
       // Label each with the current attendance count
       var updateLabels = function (group) {
@@ -394,6 +491,65 @@ Template.createDialog.error = function () {
 };
 
 Template.createDialog.date = function () {
+  return Session.get("Date");
+};
+
+///////////////////////////////////////////////////////////////////////////////
+// Edit Party dialog
+
+var openEditDialog = function (x, y, date) {
+  Session.set("editCoords", {x: x, y: y});
+  Session.set("editError", null);
+  Session.set("showEditDialog", true);
+};
+
+Template.page.showEditDialog = function () {
+  return Session.get("showEditDialog");
+};
+
+Template.editDialog.events({
+  'click .save': function (event, template) {
+    var title = template.find(".title").value;
+    var description = template.find(".description").value;
+    var public = ! template.find(".private").checked;
+    var coords = Session.get("editCoords");
+    var date = new Date(Session.get("Date"));
+
+    if (title.length && description.length) {
+      Meteor.call('editParty', {
+        title: title,
+        description: description,
+           // todo: x <- user click event coords
+		x: coords.x,
+		   // todo: y <- user click event coords
+        y: coords.y,
+        date: date,
+        public: public
+      }, function (error, party) {
+        if (! error) {
+          Session.set("selected", party);
+          if (! public && Meteor.users.find().count() > 1)
+            openInviteDialog();
+        }
+      });
+      Session.set("showEditDialog", false);
+	  console.log("Error at field length.");
+    } else {
+      Session.set("createError",
+                  "It needs a title and a description, or why bother?");
+    }
+  },
+
+  'click .cancel': function () {
+    Session.set("showEditDialog", false);
+  }
+});
+
+Template.editDialog.error = function () {
+  return Session.get("editError");
+};
+
+Template.editDialog.date = function () {
   return Session.get("Date");
 };
 

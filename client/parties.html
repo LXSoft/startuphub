@@ -14,6 +14,9 @@
 	{{#if showInviteDialog}}
 		{{> inviteDialog}}
 	{{/if}}
+	{{#if showEditDialog}}
+		{{> inviteDialog}}
+	{{/if}}
 	<div class="container">
 		<div class="row">
 			<div class="span10">
@@ -130,11 +133,7 @@
 						</small>
 					</div>
 				{{/if}}
-				<div class="create event">
-					{{#if currentUser}}
-						<input type="button" value="Create event" class="btn create pull-right">        
-					{{/if}}
-				</div>
+				{{> event}}
 			{{/with}}
 		{{else}}
 			<h1 class="muted pagination-centered">
@@ -252,6 +251,35 @@
 	</div>
 </template>
 
+<template name="editDialog">
+	<div class="mask"> </div>
+	<div class="modal">
+		<div class="modal-header">
+			<button type="button" class="close cancel">&times;</button>
+			<h3>Editing party</h3>
+		</div>
+		<div class="modal-body">
+			{{#if error}}
+				<div class="alert alert-error">{{error}}</div>
+			{{/if}}
+			<label>Title</label>
+			<input type="text" class="title span5" value="{{partyTitle}}">
+			<label>Date</label>
+			<input type="text" class="title span5" value="{{date}}" disabled="true">
+			<label>Description</label>
+			<textarea class="description span5">{{partyDescription}}</textarea>
+			<label class="checkbox">
+			<input type="checkbox" class="private">
+			Private party &mdash; invitees only
+			</label>
+		</div>
+		<div class="modal-footer">
+			<a href="#" class="btn cancel">Cancel</a>
+			<a href="#" class="btn btn-primary save">Save</a>
+		</div>
+	</div>
+</template>
+
 <template name="inviteDialog">
 	<div class="mask"> </div>
 	<div class="modal">
@@ -275,3 +303,15 @@
 	</div>
 </template>
 
+<template name="event">
+	{{#if canEdit}}
+		<div class="edit event">
+			<input type="button" value="Edit event" class="btn edit pull-right">
+		</div>
+	{{/if}}
+	{{#if canCreate}}
+		<div class="create event">
+			<input type="button" value="Create event" class="btn create pull-right">        
+		</div>
+	{{/if}}
+</template>
